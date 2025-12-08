@@ -12,6 +12,20 @@ int main() {
     int sets = 0;
     int escolha = 0;
 
+    int splited=0;
+
+    printf("Cache splited ou united?\n ");
+    printf("1: Splited  2: United \n");
+
+    scanf("%d",&splited);
+
+    while( splited != 1 && splited != 2){
+        printf("Digite um numero valido: ");
+        scanf("%d", &splited);
+    }
+
+
+    if(splited == 2){
     printf("Voce deseja criar uma cache nova ou utilizar a padrao?\n");
     printf("1: Criar  2: Padrao \n");
     scanf("%d", &escolha);
@@ -35,8 +49,34 @@ int main() {
         bsize = 4;
         sets = 1024; 
         assoc = 1;    
+    }}
+
+    else{
+        printf("Digite o nsets de iL1: \n");
+        scanf("%d", &sets);
+
+        printf("Digite o bsize de iL1: \n");
+        scanf("%d", &bsize);
+
+        printf("Digite a associatividade iL1: \n");
+        scanf("%d", &assoc);
+
+        int setsd=0;
+        int bsized=0;
+        int assocd=0;
+
+        printf("Digite o nsets de dL1: \n");
+        scanf("%d", &setsd);
+
+        printf("Digite o bsize de dL1: \n");
+        scanf("%d", &bsized);
+
+        printf("Digite a associatividade de dL1 : \n");
+        scanf("%d", &assocd);
     }
 
+
+    if(splited == 2){
     int bit_offset = (int)log2(bsize);
     int bit_index  = (int)log2(sets);
 
@@ -50,7 +90,7 @@ int main() {
         }
     }
 
-    FILE* file = fopen("enderecoscahce.dat", "rb");
+    FILE* file = fopen("dados.dat", "rb");
     if (!file) {
         printf("Erro ao abrir arquivo\n");
         return 1;
@@ -98,11 +138,123 @@ int main() {
 
     fclose(file);
 
-    printf("\n--- RESULTADOS (POLITICA RANDOM) ---\n");
+    printf("\n------------------\n");
     printf("HIT: %d\n", hit);
     printf("MISSES TOTAIS: %d\n", miss + miss_compulsorio);
     printf("MISSES CAPACIDADE+CONFLITO: %d\n", miss);
     printf("MISS COMPULSORIO: %d\n", miss_compulsorio);
+    printf("\n------------------\n");
+}
+else {
+        int offset_i = (int)log2(bsize);
+        int index_i_bits = (int)log2(sets);
+        
+        int val_i[sets][assoc];  
+        int tag_i[sets][assoc];  
+        int hit_i = 0, miss_i = 0, miss_comp_i = 0;
+
+        int offset_d = (int)log2(bsized);
+        int index_d_bits = (int)log2(setsd);
+
+        int val_d[setsd][assocd];  
+        int tag_d[setsd][assocd];  
+        int hit_d = 0, miss_d = 0, miss_comp_d = 0;
+
+        for (int i = 0; i < sets; i++){
+            for (int j = 0; j < assoc; j++){
+               val_i[i][j] = 0; 
+               tag_i[i][j] = -1; 
+            }
+        }
+        
+        for (int i = 0; i < setsd; i++){
+            for (int j = 0; j < assocd; j++){ 
+                val_d[i][j] = 0; 
+                tag_d[i][j] = -1; 
+            }
+        }
+
+        int buffer_endereco;
+        int buffer_tipo; 
+        int instrucao_qnt = 0;
+        int dados_qnt = 0;
+        
+        while (fread(&buffer_tipo, sizeof(int), 1, file) && fread(&buffer_endereco, sizeof(int), 1, file)) {
+            
+            int eh_instrucao = (buffer_tipo == 0 || buffer_tipo == 1); 
+
+            if (eh_instrucao) {
+                instrucao_qnt++;
+                int tag = buffer_endereco >> (index_i_bits + offset_i);
+                int indice = (buffer_endereco >> offset_i) & ((1 << index_i_bits) - 1);
+                int hit_ocorreu = 0; 
+                int op = -1;
+
+                for (int k = 0; k < assoc; k++) {
+                    if (val_i[indice][k] == 1 && tag_i[indice][k] == tag) {
+                        hit_i++; 
+                        hit_ocorreu = 1; 
+                        break;
+                    }
+                    if (val_i[indice][k] == 0 && op == -1) op = k;
+                }
+                if (!hit_ocorreu) {
+                    if (op != -1) {
+                        miss_comp_i++;
+                        val_i[indice][op] = 1; 
+                        tag_i[indice][op] = tag;
+                    } else {
+                        miss_i++;
+                        tag_i[indice][rand() % assoc] = tag;
+                    }
+                }
+            } 
+            else { 
+                dados_qnt++;
+                int tag = buffer_endereco >> (index_d_bits + offset_d);
+                int indice = (buffer_endereco >> offset_d) & ((1 << index_d_bits) - 1);
+                int hit_ocorreu = 0; 
+                int op = -1;
+
+                for (int k = 0; k < assocd; k++) {
+                    if (val_d[indice][k] == 1 && tag_d[indice][k] == tag) {
+                        hit_d++; 
+                        hit_ocorreu = 1; 
+                        break;
+                    }
+                    if (val_d[indice][k] == 0 && op == -1) op = k;
+                }
+                if (!hit_ocorreu) {
+                    if (op != -1) {
+                        miss_comp_d++;
+                        val_d[indice][op] = 1; 
+                        tag_d[indice][op] = tag;
+                    } else {
+                        miss_d++;
+                        tag_d[indice][rand() % assocd] = tag;
+                    }
+                }
+            }
+        } 
+        
+        fclose(file); 
+       
+        printf("\n======= RESULTADOS SPLIT =======\n");
+        
+        printf("----- DADOS -----\n");
+        printf("Quantidade Acessos: %d\n", dados_qnt);
+        printf("HIT: %d\n", hit_d);
+        printf("MISS TOTAL: %d\n", miss_d + miss_comp_d);
+        printf("Hit-rate: %.2f%%\n", (float)hit_d * 100.0 / dados_qnt);
+        printf("--------------------------------\n");
+
+        printf("\n----- INSTRUCOES -------\n");
+        printf("Quantidade Acessos: %d\n", instrucao_qnt);
+        printf("HIT: %d\n", hit_i);
+        printf("MISS TOTAL: %d\n", miss_i + miss_comp_i);
+        printf("Hit-rate: %.2f%%\n", (float)hit_i * 100.0 / instrucao_qnt);  
+        printf("--------------------------------\n");
+    }
 
     return 0;
 }

@@ -1,0 +1,108 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <time.h> 
+
+int main() {
+    
+    srand(time(NULL));
+
+    int bsize = 0;
+    int assoc = 0;
+    int sets = 0;
+    int escolha = 0;
+
+    printf("Voce deseja criar uma cache nova ou utilizar a padrao?\n");
+    printf("1: Criar  2: Padrao \n");
+    scanf("%d", &escolha);
+
+    while( escolha != 1 && escolha != 2){
+        printf("Digite um numero valido: ");
+        scanf("%d", &escolha);
+    }
+
+    if(escolha == 1){
+        printf("Digite o nsets : \n");
+        scanf("%d", &sets);
+
+        printf("Digite o bsize : \n");
+        scanf("%d", &bsize);
+
+        printf("Digite a associatividade : \n");
+        scanf("%d", &assoc);
+    }
+    else{
+        bsize = 4;
+        sets = 1024; 
+        assoc = 1;    
+    }
+
+    int bit_offset = (int)log2(bsize);
+    int bit_index  = (int)log2(sets);
+
+    int val[sets][assoc];
+    int tag_array[sets][assoc];
+
+    for (int i = 0; i < sets; i++) {
+        for (int j = 0; j < assoc; j++) {
+            val[i][j] = 0;
+            tag_array[i][j] = -1;
+        }
+    }
+
+    FILE* file = fopen("enderecoscahce.dat", "rb");
+    if (!file) {
+        printf("Erro ao abrir arquivo\n");
+        return 1;
+    }
+
+    int buffer;
+    int hit = 0;
+    int miss = 0; 
+    int miss_compulsorio = 0;
+
+    while (fread(&buffer, sizeof(int), 1, file) == 1) {
+
+        int tag = buffer >> (bit_index + bit_offset);
+        int indice = (buffer >> bit_offset) & ((1 << bit_index) - 1);
+        
+        int hit_ocorreu = 0;
+        int op = -1;
+
+
+        for (int k = 0; k < assoc; k++) {
+            if (val[indice][k] == 1 && tag_array[indice][k] == tag) {
+                hit++;
+                hit_ocorreu = 1;
+                break; 
+            }
+
+            if (val[indice][k] == 0 && op == -1) {
+                op = k;
+            }
+        }
+
+        if (!hit_ocorreu) {
+            if (op != -1) {
+                miss_compulsorio++;
+                val[indice][op] = 1;
+                tag_array[indice][op] = tag;
+            } 
+            else {
+                miss++;
+                int via_vitima = rand() % assoc;            
+                tag_array[indice][via_vitima] = tag;
+            }
+        }
+    }
+
+    fclose(file);
+
+    printf("\n--- RESULTADOS (POLITICA RANDOM) ---\n");
+    printf("HIT: %d\n", hit);
+    printf("MISSES TOTAIS: %d\n", miss + miss_compulsorio);
+    printf("MISSES CAPACIDADE+CONFLITO: %d\n", miss);
+    printf("MISS COMPULSORIO: %d\n", miss_compulsorio);
+
+    return 0;
+}
